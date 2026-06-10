@@ -1,8 +1,8 @@
 <!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="UTF-8"/>
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
+<!-- saved from url=(0057)file:///C:/Users/jamey/Downloads/chad-tracker-live_5.html -->
+<html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>Chad Counter ⛳</title>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
@@ -80,6 +80,17 @@
   .modal-btns .keep { background:#E8E4DC; color:#2D5016; }
   .modal-btns .newround { background:#2D5016; color:#fff; }
 
+  /* QR MODAL */
+  #qrModal { position:fixed; inset:0; background:rgba(0,0,0,0.85); display:none; align-items:center; justify-content:center; z-index:200; padding:16px; }
+  #qrModal.show { display:flex; }
+  .qr-card { background:#F5F0E8; border-radius:20px; padding:28px 24px; width:100%; max-width:340px; text-align:center; box-shadow:0 8px 40px rgba(0,0,0,0.5); }
+  .qr-card h2 { color:#2D5016; font-size:20px; margin-bottom:4px; }
+  .qr-card .qr-sub { color:#888; font-size:13px; margin-bottom:20px; }
+  .qr-code-wrap { background:#fff; border-radius:12px; padding:16px; display:inline-block; margin-bottom:16px; box-shadow:0 2px 8px rgba(0,0,0,0.1); }
+  .qr-room-code { font-size:22px; font-weight:bold; letter-spacing:4px; color:#2D5016; background:#e8f5e0; border-radius:10px; padding:10px 16px; margin-bottom:16px; }
+  .qr-url { font-size:11px; color:#aaa; margin-bottom:20px; word-break:break-all; }
+  .btn-close-qr { width:100%; padding:12px; background:#2D5016; border:none; border-radius:10px; color:#fff; font-size:15px; font-family:Georgia,serif; font-weight:bold; cursor:pointer; }
+
   /* SPINNER */
   .spinner { width:40px; height:40px; border:4px solid rgba(255,255,255,0.2); border-top-color:#C9A84C; border-radius:50%; animation:spin 0.8s linear infinite; margin:0 auto 16px; }
   @keyframes spin { to { transform:rotate(360deg); } }
@@ -88,19 +99,19 @@
 </head>
 <body>
 
-<div id="loading"><div class="spinner"></div>Loading…</div>
+<div id="loading" style="display: none;"><div class="spinner"></div>Loading…</div>
 
-<div id="lobby">
+<div id="lobby" style="display: flex;">
   <h1>⛳ Chad Counter</h1>
   <p class="sub">$5 to charity per bad drive</p>
   <div class="lobby-card">
     <h2>Start or Join a Round</h2>
     <div class="field-label">Your name</div>
-    <input id="yourName" class="text-input" placeholder="e.g. James" maxlength="20"/>
+    <input id="yourName" class="text-input" placeholder="e.g. James" maxlength="20">
     <button class="btn-primary" id="btnCreate">🏌️ Start New Round</button>
     <div class="divider">or join existing</div>
     <div class="field-label">Room code</div>
-    <input id="joinCode" class="text-input" placeholder="e.g. BIRDIE-4829" maxlength="12" style="text-transform:uppercase;letter-spacing:2px"/>
+    <input id="joinCode" class="text-input" placeholder="e.g. BIRDIE-4829" maxlength="12" style="text-transform:uppercase;letter-spacing:2px">
     <button class="btn-secondary" id="btnJoin">Join Round →</button>
     <div class="error-msg" id="lobbyError"></div>
   </div>
@@ -113,22 +124,65 @@
     <div>
       <button class="room-pill" id="roomPill">ROOM-????</button>
     </div>
-    <div id="connPill" class="conn-pill offline">● connecting…</div>
+    <div style="display:flex;align-items:center;justify-content:center;gap:10px;margin-top:6px">
+      <div id="connPill" class="conn-pill offline" style="margin-top:0">● connecting…</div>
+      <button onclick="showQR()" style="background:rgba(255,255,255,0.12);border:none;border-radius:20px;color:#C9A84C;font-size:12px;padding:3px 12px;cursor:pointer;font-family:Georgia,serif;letter-spacing:1px">📷 QR</button>
+    </div>
   </div>
   <div class="total-banner">
     <div class="label">Total Donated</div>
     <div class="amount" id="totalAmount">$0.00</div>
   </div>
   <div class="players-list" id="playersList"></div>
+  <div style="padding:0 12px 10px">
+    <button id="btnAddPlayer" style="width:100%;padding:12px;background:rgba(255,255,255,0.08);border:2px dashed rgba(255,255,255,0.3);border-radius:10px;color:rgba(255,255,255,0.7);font-size:14px;font-family:Georgia,serif;cursor:pointer;">
+      + Add Player
+    </button>
+  </div>
   <div class="actions" style="margin-top:4px">
     <button class="btn-end" id="btnEnd">🏆 End Round</button>
     <button class="btn-reset" id="btnReset">Reset</button>
   </div>
 </div>
 
+<!-- Add Player Modal -->
+<div id="addPlayerModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.75);align-items:center;justify-content:center;z-index:150;padding:16px;">
+  <div style="background:#F5F0E8;border-radius:16px;padding:28px 24px;width:100%;max-width:340px;box-shadow:0 8px 40px rgba(0,0,0,0.4);">
+    <h2 style="color:#2D5016;font-size:20px;margin-bottom:6px;text-align:center">Add a Player</h2>
+    <p style="color:#888;font-size:13px;text-align:center;margin-bottom:20px">Enter their name to add them to this round</p>
+    <div style="font-size:12px;color:#888;text-transform:uppercase;letter-spacing:1px;margin-bottom:6px">Player name</div>
+    <input id="newPlayerName" class="text-input" placeholder="e.g. Dave" maxlength="20">
+    <div style="font-size:12px;color:#888;margin-top:10px;margin-bottom:16px">
+      <label style="display:flex;align-items:center;gap:8px;cursor:pointer">
+        <input type="checkbox" id="chkControlThis" checked="" style="width:16px;height:16px;accent-color:#2D5016">
+        I'll tap their Chad buttons for them
+      </label>
+    </div>
+    <div style="display:flex;gap:10px">
+      <button onclick="hideAddPlayer()" style="flex:1;padding:12px;background:#E8E4DC;border:none;border-radius:10px;color:#2D5016;font-weight:bold;font-size:14px;font-family:Georgia,serif;cursor:pointer;">Cancel</button>
+      <button id="btnConfirmAdd" style="flex:1;padding:12px;background:#2D5016;border:none;border-radius:10px;color:#fff;font-weight:bold;font-size:14px;font-family:Georgia,serif;cursor:pointer;">Add Player</button>
+    </div>
+    <div class="error-msg" id="addPlayerError" style="margin-top:8px"></div>
+  </div>
+</div>
+
+<div id="qrModal">
+  <div class="qr-card">
+    <h2>📷 Scan to Join</h2>
+    <p class="qr-sub">Point your phone camera at this code</p>
+    <div class="qr-code-wrap">
+      <canvas id="qrCanvas" width="200" height="200"></canvas>
+    </div>
+    <div class="qr-room-code" id="qrRoomCode"></div>
+    <div class="qr-url" id="qrUrl"></div>
+    <button class="btn-close-qr" onclick="hideQR()">Done</button>
+  </div>
+</div>
+
 <div id="toast"></div>
 <div id="summaryModal"></div>
 
+<script src="./index_files/qrcode.min.js.download"></script>
 <script type="module">
 import { initializeApp }           from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import { getDatabase, ref, set, get, onValue, update } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
@@ -379,9 +433,57 @@ window.doReset = async () => {
   window.closeSummary();
 };
 
+// ── QR Code ────────────────────────────────────────────────
+window.showQR = () => {
+  const joinUrl = `${location.href.split('?')[0]}?room=${roomCode}`;
+  document.getElementById("qrRoomCode").textContent = roomCode;
+  document.getElementById("qrUrl").textContent = joinUrl;
+  const canvas = document.getElementById("qrCanvas");
+  // Clear previous
+  const ctx = canvas.getContext("2d");
+  ctx.clearRect(0,0,200,200);
+  try {
+    // QRCode lib writes to a container div, we use a temp div then copy to canvas
+    const tmp = document.createElement("div");
+    tmp.style.display = "none";
+    document.body.appendChild(tmp);
+    new QRCode(tmp, {
+      text: joinUrl,
+      width: 200, height: 200,
+      colorDark: "#2D5016", colorLight: "#ffffff",
+      correctLevel: QRCode.CorrectLevel.M
+    });
+    // QRCode renders an img; copy it to canvas once loaded
+    const img = tmp.querySelector("img") || tmp.querySelector("canvas");
+    if (img && img.tagName === "CANVAS") {
+      ctx.drawImage(img, 0, 0);
+      document.body.removeChild(tmp);
+    } else if (img) {
+      img.onload = () => { ctx.drawImage(img, 0, 0); document.body.removeChild(tmp); };
+    } else {
+      // Fallback: try canvas child
+      setTimeout(() => {
+        const c2 = tmp.querySelector("canvas");
+        if (c2) ctx.drawImage(c2, 0, 0);
+        document.body.removeChild(tmp);
+      }, 100);
+    }
+  } catch(e) { console.warn("QR error", e); }
+  document.getElementById("qrModal").classList.add("show");
+};
+
+window.hideQR = () => {
+  document.getElementById("qrModal").classList.remove("show");
+};
+
+// Auto-join from URL param
+const _urlRoom = new URLSearchParams(location.search).get("room");
+if (_urlRoom) { document.getElementById("joinCode").value = _urlRoom.toUpperCase(); }
+
 // ── Boot ───────────────────────────────────────────────────
 document.getElementById("loading").style.display = "none";
 document.getElementById("lobby").style.display   = "flex";
 </script>
-</body>
-</html>
+
+
+</body></html>
