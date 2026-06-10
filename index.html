@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- saved from url=(0057)file:///C:/Users/jamey/Downloads/chad-tracker-live_7.html -->
+<!-- saved from url=(0057)file:///C:/Users/jamey/Downloads/chad-tracker-live_8.html -->
 <html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
 
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
@@ -91,6 +91,9 @@
   .qr-url { font-size:11px; color:#aaa; margin-bottom:20px; word-break:break-all; }
   .btn-close-qr { width:100%; padding:12px; background:#2D5016; border:none; border-radius:10px; color:#fff; font-size:15px; font-family:Georgia,serif; font-weight:bold; cursor:pointer; }
 
+  .amt-btn { padding:8px 14px; border:2px solid #ddd; border-radius:8px; background:#fff; color:#2D5016; font-size:14px; font-family:Georgia,serif; cursor:pointer; transition:all 0.15s; }
+  .amt-btn.selected { background:#2D5016; color:#fff; border-color:#2D5016; }
+
   /* SPINNER */
   .spinner { width:40px; height:40px; border:4px solid rgba(255,255,255,0.2); border-top-color:#C9A84C; border-radius:50%; animation:spin 0.8s linear infinite; margin:0 auto 16px; }
   @keyframes spin { to { transform:rotate(360deg); } }
@@ -103,17 +106,29 @@
 
 <div id="lobby" style="display: flex;">
   <h1>⛳ Chad Counter</h1>
-  <p class="sub">$5 to charity per bad drive</p>
+  <p class="sub" id="lobbySub">$5 to charity per bad drive</p>
   <div class="lobby-card">
     <h2>Start or Join a Round</h2>
     <div class="field-label">Your name</div>
     <input id="yourName" class="text-input" placeholder="e.g. James" maxlength="20">
+    <div class="field-label" style="margin-top:12px">Charity name</div>
+    <input id="charityName" class="text-input" placeholder="e.g. St. Jude Children&#39;s Hospital" maxlength="50">
+    <div class="field-label" style="margin-top:12px">Donation per bad drive</div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:4px" id="amountPicker">
+      <button class="amt-btn selected" data-amt="1">$1</button>
+      <button class="amt-btn" data-amt="2">$2</button>
+      <button class="amt-btn" data-amt="5">$5</button>
+      <button class="amt-btn" data-amt="10">$10</button>
+      <button class="amt-btn" data-amt="20">$20</button>
+      <button class="amt-btn" data-amt="custom">Other</button>
+    </div>
+    <input id="customAmt" class="text-input" placeholder="Enter amount" type="number" min="1" max="999" style="display:none;margin-top:6px">
     <button class="btn-primary" id="btnCreate">🏌️ Start New Round</button>
     <div class="divider">or join existing</div>
     <div class="field-label">Room code</div>
     <input id="joinCode" class="text-input" placeholder="e.g. BIRDIE-4829" maxlength="12" style="text-transform:uppercase;letter-spacing:2px">
     <button class="btn-secondary" id="btnJoin">Join Round →</button>
-    <div class="error-msg" id="lobbyError"></div>
+    <div class="error-msg" id="lobbyError">Enter your name first.</div>
   </div>
 </div>
 
@@ -130,8 +145,9 @@
     </div>
   </div>
   <div class="total-banner">
-    <div class="label">Total Donated</div>
+    <div class="label" id="charityLabel">Total Donated</div>
     <div class="amount" id="totalAmount">$0.00</div>
+    <div style="font-size:11px;color:#2D5016;opacity:0.7;margin-top:2px" id="perDriveLabel"></div>
   </div>
   <div class="players-list" id="playersList"></div>
   <div style="padding:0 12px 10px">
@@ -201,16 +217,17 @@ const app = initializeApp({
 const db = getDatabase(app);
 
 // ── Constants ──────────────────────────────────────────────
-const PENALTY    = 5;
 const CHAD_TYPES = ["Chad A", "Chad B", "Chad C"];
-const EMOJIS     = { "Chad A": "🍕", "Chad B": "⛏️", "Chad C": "💨" };
+const EMOJIS     = { "Chad A": "🚀", "Chad B": "🐛", "Chad C": "🌊" };
 const WORDS      = ["BIRDIE","EAGLE","BOGEY","CADDY","WEDGE","LINKS","DIVOT","FORE"];
 
 // ── State ──────────────────────────────────────────────────
 let roomCode       = null;
 let myPlayerId     = null;
-let liveState      = null;   // mirror of Firebase room
-let controlledPids = new Set(); // pids this device can tap for
+let liveState      = null;
+let controlledPids = new Set();
+let penalty        = 5;       // per-drive donation amount
+let charityName    = "";      // charity display name
 
 // ── Helpers ────────────────────────────────────────────────
 const esc = s => String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
@@ -232,16 +249,45 @@ function showError(msg) {
   document.getElementById("lobbyError").textContent = msg;
 }
 
+// ── Amount picker ──────────────────────────────────────────
+let selectedAmt = 5;
+document.querySelectorAll(".amt-btn").forEach(btn => {
+  btn.classList.remove("selected");
+  if (btn.dataset.amt === "5") btn.classList.add("selected");
+  btn.onclick = () => {
+    document.querySelectorAll(".amt-btn").forEach(b => b.classList.remove("selected"));
+    btn.classList.add("selected");
+    if (btn.dataset.amt === "custom") {
+      document.getElementById("customAmt").style.display = "block";
+      document.getElementById("customAmt").focus();
+      selectedAmt = null;
+    } else {
+      document.getElementById("customAmt").style.display = "none";
+      selectedAmt = parseInt(btn.dataset.amt);
+    }
+  };
+});
+document.getElementById("customAmt").oninput = e => {
+  selectedAmt = parseFloat(e.target.value) || null;
+};
+
 // ── Lobby ──────────────────────────────────────────────────
 document.getElementById("btnCreate").onclick = async () => {
-  const name = document.getElementById("yourName").value.trim();
-  if (!name) { showError("Enter your name first."); return; }
+  const name    = document.getElementById("yourName").value.trim();
+  const charity = document.getElementById("charityName").value.trim();
+  const amt     = selectedAmt || parseFloat(document.getElementById("customAmt").value);
+  if (!name)          { showError("Enter your name first."); return; }
+  if (!amt || amt<=0) { showError("Select a donation amount."); return; }
   roomCode    = genRoomCode();
   myPlayerId  = genPlayerId();
+  penalty     = amt;
+  charityName = charity;
   controlledPids.add(myPlayerId);
   await set(ref(db, `rooms/${roomCode}`), {
     createdAt: Date.now(),
-    players: { [myPlayerId]: { name, log: {} } }
+    penalty:   amt,
+    charity:   charity,
+    players:   { [myPlayerId]: { name, log: {} } }
   });
   enterGame();
 };
@@ -253,8 +299,11 @@ document.getElementById("btnJoin").onclick = async () => {
   if (!code) { showError("Enter a room code."); return; }
   const snap = await get(ref(db, `rooms/${code}`));
   if (!snap.exists()) { showError(`Room "${code}" not found. Check the code and try again.`); return; }
-  roomCode   = code;
-  myPlayerId = genPlayerId();
+  const roomData = snap.val();
+  roomCode    = code;
+  myPlayerId  = genPlayerId();
+  penalty     = roomData.penalty || 5;
+  charityName = roomData.charity || "";
   controlledPids.add(myPlayerId);
   await set(ref(db, `rooms/${roomCode}/players/${myPlayerId}`), { name, log: {} });
   enterGame();
@@ -265,6 +314,8 @@ function enterGame() {
   document.getElementById("lobby").style.display = "none";
   document.getElementById("game").style.display  = "block";
   document.getElementById("roomPill").textContent = roomCode;
+  document.getElementById("charityLabel").textContent = charityName ? `💚 ${charityName}` : "Total Donated";
+  document.getElementById("perDriveLabel").textContent = `$${penalty} per bad drive`;
 
   // Subscribe to live updates
   onValue(ref(db, `rooms/${roomCode}`), snap => {
@@ -272,6 +323,9 @@ function enterGame() {
     document.getElementById("connPill").textContent = "● live";
     document.getElementById("connPill").className   = "conn-pill online";
     liveState = snap.val();
+    // Keep penalty/charity in sync if room settings updated
+    if (liveState.penalty) { penalty = liveState.penalty; document.getElementById("perDriveLabel").textContent = `$${penalty} per bad drive`; }
+    if (liveState.charity !== undefined) { charityName = liveState.charity; document.getElementById("charityLabel").textContent = charityName ? `💚 ${charityName}` : "Total Donated"; }
     renderGame();
   }, () => {
     document.getElementById("connPill").textContent = "● offline";
@@ -292,7 +346,7 @@ function renderGame() {
 
   sorted.forEach(([pid, player]) => {
     const logArr   = Object.values(player.log || {});
-    const pTotal   = logArr.length * PENALTY;
+    const pTotal   = logArr.length * penalty;
     total += pTotal;
     const isMe     = pid === myPlayerId;
     const canCtrl  = controlledPids.has(pid);
@@ -344,7 +398,7 @@ window.addChad = async (pid, chadType) => {
   log[key]     = { type: chadType, ts: Date.now() };
   await set(logRef, log);
   const name = liveState?.players?.[pid]?.name || "Player";
-  showToast(`💸 ${name} — ${chadType}! +$${PENALTY}`);
+  showToast(`💸 ${name} — ${chadType}! +$${penalty}`);
 };
 
 window.undoLast = async (pid) => {
@@ -390,7 +444,7 @@ document.getElementById("btnEnd").onclick = () => {
   let total = 0;
   const rows = sorted.map(([, player]) => {
     const log  = Object.values(player.log || {});
-    const amt  = log.length * PENALTY;
+    const amt  = log.length * penalty;
     total += amt;
     const detail = CHAD_TYPES.map(c => {
       const n = log.filter(e=>e.type===c).length;
@@ -415,7 +469,7 @@ document.getElementById("btnEnd").onclick = () => {
       <p class="modal-sub">Time to settle up with the charity jar!</p>
       ${rows}
       <div class="summary-total-bar">
-        <span>💚 Total to Charity</span>
+        <span>💚 ${charityName || "Charity"}</span>
         <span class="big">$${total.toFixed(2)}</span>
       </div>
       <div class="modal-btns">
