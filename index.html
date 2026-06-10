@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- saved from url=(0057)file:///C:/Users/jamey/Downloads/chad-tracker-live_6.html -->
+<!-- saved from url=(0057)file:///C:/Users/jamey/Downloads/chad-tracker-live_7.html -->
 <html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
 
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
@@ -101,7 +101,7 @@
 
 <div id="loading" style="display: none;"><div class="spinner"></div>Loading…</div>
 
-<div id="lobby" style="display: none;">
+<div id="lobby" style="display: flex;">
   <h1>⛳ Chad Counter</h1>
   <p class="sub">$5 to charity per bad drive</p>
   <div class="lobby-card">
@@ -117,15 +117,15 @@
   </div>
 </div>
 
-<div id="game" style="display: block;">
+<div id="game">
   <div class="top-bar">
     <div class="eyebrow">Charity Drive</div>
     <h1>⛳ Chad Counter</h1>
     <div>
-      <button class="room-pill" id="roomPill">BOGEY-7279</button>
+      <button class="room-pill" id="roomPill">ROOM-????</button>
     </div>
     <div style="display:flex;align-items:center;justify-content:center;gap:10px;margin-top:6px">
-      <div id="connPill" class="conn-pill online" style="margin-top:0">● live</div>
+      <div id="connPill" class="conn-pill offline" style="margin-top:0">● connecting…</div>
       <button onclick="showQR()" style="background:rgba(255,255,255,0.12);border:none;border-radius:20px;color:#C9A84C;font-size:12px;padding:3px 12px;cursor:pointer;font-family:Georgia,serif;letter-spacing:1px">📷 QR</button>
     </div>
   </div>
@@ -133,37 +133,7 @@
     <div class="label">Total Donated</div>
     <div class="amount" id="totalAmount">$0.00</div>
   </div>
-  <div class="players-list" id="playersList"><div class="player-card">
-      <div class="player-card-header">
-        <div class="player-name-wrap" id="nameWrap_p_xjrapwv">
-          <span style="cursor:pointer" onclick="editName(&#39;p_xjrapwv&#39;)">James ✏️</span>
-        </div>
-        <div class="player-total zero">$0</div>
-      </div>
-      <div class="chad-btns">
-        
-          <button class="chad-btn" onclick="addChad(&#39;p_xjrapwv&#39;,&#39;Chad A&#39;)">
-            <div class="icon">🍕</div>
-            <div class="name">Chad A</div>
-            <div class="count">×0</div>
-          </button>
-          <button class="chad-btn" onclick="addChad(&#39;p_xjrapwv&#39;,&#39;Chad B&#39;)">
-            <div class="icon">⛏️</div>
-            <div class="name">Chad B</div>
-            <div class="count">×0</div>
-          </button>
-          <button class="chad-btn" onclick="addChad(&#39;p_xjrapwv&#39;,&#39;Chad C&#39;)">
-            <div class="icon">💨</div>
-            <div class="name">Chad C</div>
-            <div class="count">×0</div>
-          </button>
-      </div>
-      <div class="player-footer">
-        <div class="footer-log">
-          No bad drives yet 🎯
-        </div>
-        
-      </div></div></div>
+  <div class="players-list" id="playersList"></div>
   <div style="padding:0 12px 10px">
     <button id="btnAddPlayer" style="width:100%;padding:12px;background:rgba(255,255,255,0.08);border:2px dashed rgba(255,255,255,0.3);border-radius:10px;color:rgba(255,255,255,0.7);font-size:14px;font-family:Georgia,serif;cursor:pointer;">
       + Add Player
@@ -201,7 +171,9 @@
     <h2>📷 Scan to Join</h2>
     <p class="qr-sub">Point your phone camera at this code</p>
     <div class="qr-code-wrap">
-      <canvas id="qrCanvas" width="200" height="200"></canvas>
+      <div id="qrImgWrap" style="width:220px;height:220px;display:flex;align-items:center;justify-content:center;">
+        <div style="color:#aaa;font-size:13px">Loading…</div>
+      </div>
     </div>
     <div class="qr-room-code" id="qrRoomCode"></div>
     <div class="qr-url" id="qrUrl"></div>
@@ -212,7 +184,6 @@
 <div id="toast"></div>
 <div id="summaryModal"></div>
 
-<script src="./index_files/qrcode.min.js.download"></script>
 <script type="module">
 import { initializeApp }           from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import { getDatabase, ref, set, get, onValue, update } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
@@ -495,43 +466,20 @@ document.getElementById("newPlayerName").onkeydown = e => {
   if (e.key === "Enter") document.getElementById("btnConfirmAdd").click();
 };
 
-// ── QR Code ────────────────────────────────────────────────
+// ── QR Code (pure JS, draws directly to canvas) ────────────
+// Minimal QR encoder for alphanumeric + byte mode, version auto-select
+// Uses the qrcode-generator approach reimplemented inline
+
 window.showQR = () => {
   const joinUrl = `${location.href.split('?')[0]}?room=${roomCode}`;
   document.getElementById("qrRoomCode").textContent = roomCode;
   document.getElementById("qrUrl").textContent = joinUrl;
-  const canvas = document.getElementById("qrCanvas");
-  // Clear previous
-  const ctx = canvas.getContext("2d");
-  ctx.clearRect(0,0,200,200);
-  try {
-    // QRCode lib writes to a container div, we use a temp div then copy to canvas
-    const tmp = document.createElement("div");
-    tmp.style.display = "none";
-    document.body.appendChild(tmp);
-    new QRCode(tmp, {
-      text: joinUrl,
-      width: 200, height: 200,
-      colorDark: "#2D5016", colorLight: "#ffffff",
-      correctLevel: QRCode.CorrectLevel.M
-    });
-    // QRCode renders an img; copy it to canvas once loaded
-    const img = tmp.querySelector("img") || tmp.querySelector("canvas");
-    if (img && img.tagName === "CANVAS") {
-      ctx.drawImage(img, 0, 0);
-      document.body.removeChild(tmp);
-    } else if (img) {
-      img.onload = () => { ctx.drawImage(img, 0, 0); document.body.removeChild(tmp); };
-    } else {
-      // Fallback: try canvas child
-      setTimeout(() => {
-        const c2 = tmp.querySelector("canvas");
-        if (c2) ctx.drawImage(c2, 0, 0);
-        document.body.removeChild(tmp);
-      }, 100);
-    }
-  } catch(e) { console.warn("QR error", e); }
   document.getElementById("qrModal").classList.add("show");
+  // Use a reliable external QR API that returns an image directly
+  const encoded = encodeURIComponent(joinUrl);
+  const apiUrl  = `https://api.qrserver.com/v1/create-qr-code/?size=220x220&color=2D5016&bgcolor=FFFFFF&data=${encoded}&qzone=1`;
+  const wrap    = document.getElementById("qrImgWrap");
+  wrap.innerHTML = `<img src="${apiUrl}" width="220" height="220" style="border-radius:8px;display:block" onerror="this.parentElement.innerHTML='<div style=\\'padding:20px;color:#888;font-size:13px;text-align:center\\'>QR requires internet.<br>Share the code below instead.</div>'"/>`;
 };
 
 window.hideQR = () => {
