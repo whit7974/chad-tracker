@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- saved from url=(0057)file:///C:/Users/jamey/Downloads/chad-tracker-live_5.html -->
+<!-- saved from url=(0057)file:///C:/Users/jamey/Downloads/chad-tracker-live_6.html -->
 <html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
 
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
@@ -101,7 +101,7 @@
 
 <div id="loading" style="display: none;"><div class="spinner"></div>Loading…</div>
 
-<div id="lobby" style="display: flex;">
+<div id="lobby" style="display: none;">
   <h1>⛳ Chad Counter</h1>
   <p class="sub">$5 to charity per bad drive</p>
   <div class="lobby-card">
@@ -117,15 +117,15 @@
   </div>
 </div>
 
-<div id="game">
+<div id="game" style="display: block;">
   <div class="top-bar">
     <div class="eyebrow">Charity Drive</div>
     <h1>⛳ Chad Counter</h1>
     <div>
-      <button class="room-pill" id="roomPill">ROOM-????</button>
+      <button class="room-pill" id="roomPill">BOGEY-7279</button>
     </div>
     <div style="display:flex;align-items:center;justify-content:center;gap:10px;margin-top:6px">
-      <div id="connPill" class="conn-pill offline" style="margin-top:0">● connecting…</div>
+      <div id="connPill" class="conn-pill online" style="margin-top:0">● live</div>
       <button onclick="showQR()" style="background:rgba(255,255,255,0.12);border:none;border-radius:20px;color:#C9A84C;font-size:12px;padding:3px 12px;cursor:pointer;font-family:Georgia,serif;letter-spacing:1px">📷 QR</button>
     </div>
   </div>
@@ -133,7 +133,37 @@
     <div class="label">Total Donated</div>
     <div class="amount" id="totalAmount">$0.00</div>
   </div>
-  <div class="players-list" id="playersList"></div>
+  <div class="players-list" id="playersList"><div class="player-card">
+      <div class="player-card-header">
+        <div class="player-name-wrap" id="nameWrap_p_xjrapwv">
+          <span style="cursor:pointer" onclick="editName(&#39;p_xjrapwv&#39;)">James ✏️</span>
+        </div>
+        <div class="player-total zero">$0</div>
+      </div>
+      <div class="chad-btns">
+        
+          <button class="chad-btn" onclick="addChad(&#39;p_xjrapwv&#39;,&#39;Chad A&#39;)">
+            <div class="icon">🍕</div>
+            <div class="name">Chad A</div>
+            <div class="count">×0</div>
+          </button>
+          <button class="chad-btn" onclick="addChad(&#39;p_xjrapwv&#39;,&#39;Chad B&#39;)">
+            <div class="icon">⛏️</div>
+            <div class="name">Chad B</div>
+            <div class="count">×0</div>
+          </button>
+          <button class="chad-btn" onclick="addChad(&#39;p_xjrapwv&#39;,&#39;Chad C&#39;)">
+            <div class="icon">💨</div>
+            <div class="name">Chad C</div>
+            <div class="count">×0</div>
+          </button>
+      </div>
+      <div class="player-footer">
+        <div class="footer-log">
+          No bad drives yet 🎯
+        </div>
+        
+      </div></div></div>
   <div style="padding:0 12px 10px">
     <button id="btnAddPlayer" style="width:100%;padding:12px;background:rgba(255,255,255,0.08);border:2px dashed rgba(255,255,255,0.3);border-radius:10px;color:rgba(255,255,255,0.7);font-size:14px;font-family:Georgia,serif;cursor:pointer;">
       + Add Player
@@ -206,9 +236,10 @@ const EMOJIS     = { "Chad A": "🍕", "Chad B": "⛏️", "Chad C": "💨" };
 const WORDS      = ["BIRDIE","EAGLE","BOGEY","CADDY","WEDGE","LINKS","DIVOT","FORE"];
 
 // ── State ──────────────────────────────────────────────────
-let roomCode    = null;
-let myPlayerId  = null;
-let liveState   = null;   // mirror of Firebase room
+let roomCode       = null;
+let myPlayerId     = null;
+let liveState      = null;   // mirror of Firebase room
+let controlledPids = new Set(); // pids this device can tap for
 
 // ── Helpers ────────────────────────────────────────────────
 const esc = s => String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
@@ -236,6 +267,7 @@ document.getElementById("btnCreate").onclick = async () => {
   if (!name) { showError("Enter your name first."); return; }
   roomCode    = genRoomCode();
   myPlayerId  = genPlayerId();
+  controlledPids.add(myPlayerId);
   await set(ref(db, `rooms/${roomCode}`), {
     createdAt: Date.now(),
     players: { [myPlayerId]: { name, log: {} } }
@@ -252,6 +284,7 @@ document.getElementById("btnJoin").onclick = async () => {
   if (!snap.exists()) { showError(`Room "${code}" not found. Check the code and try again.`); return; }
   roomCode   = code;
   myPlayerId = genPlayerId();
+  controlledPids.add(myPlayerId);
   await set(ref(db, `rooms/${roomCode}/players/${myPlayerId}`), { name, log: {} });
   enterGame();
 };
@@ -287,19 +320,20 @@ function renderGame() {
   );
 
   sorted.forEach(([pid, player]) => {
-    const logArr  = Object.values(player.log || {});
-    const pTotal  = logArr.length * PENALTY;
+    const logArr   = Object.values(player.log || {});
+    const pTotal   = logArr.length * PENALTY;
     total += pTotal;
-    const isMe    = pid === myPlayerId;
-    const counts  = Object.fromEntries(CHAD_TYPES.map(c => [c, logArr.filter(e=>e.type===c).length]));
-    const lastLog = logArr.length > 0 ? logArr[logArr.length-1].type : null;
+    const isMe     = pid === myPlayerId;
+    const canCtrl  = controlledPids.has(pid);
+    const counts   = Object.fromEntries(CHAD_TYPES.map(c => [c, logArr.filter(e=>e.type===c).length]));
+    const lastLog  = logArr.length > 0 ? logArr[logArr.length-1].type : null;
 
     const card = document.createElement("div");
     card.className = "player-card";
     card.innerHTML = `
       <div class="player-card-header">
         <div class="player-name-wrap" id="nameWrap_${pid}">
-          ${isMe
+          ${canCtrl
             ? `<span style="cursor:pointer" onclick="editName('${pid}')">${esc(player.name)} ✏️</span>`
             : esc(player.name)
           }
@@ -308,7 +342,7 @@ function renderGame() {
       </div>
       <div class="chad-btns">
         ${CHAD_TYPES.map(chad => `
-          <button class="chad-btn" ${isMe ? `onclick="addChad('${pid}','${esc(chad)}')"` : 'disabled'}>
+          <button class="chad-btn" ${canCtrl ? `onclick="addChad('${pid}','${esc(chad)}')"` : 'disabled'}>
             <div class="icon">${EMOJIS[chad]}</div>
             <div class="name">${chad}</div>
             <div class="count">×${counts[chad]}</div>
@@ -320,7 +354,7 @@ function renderGame() {
             ? "No bad drives yet 🎯"
             : `${logArr.length} bad drive${logArr.length>1?"s":""} · Last: ${lastLog}`}
         </div>
-        ${isMe && logArr.length > 0
+        ${canCtrl && logArr.length > 0
           ? `<button class="undo-btn" onclick="undoLast('${pid}')">undo</button>`
           : ""}
       </div>`;
@@ -353,7 +387,7 @@ window.undoLast = async (pid) => {
 };
 
 window.editName = (pid) => {
-  if (pid !== myPlayerId) return;
+  if (!controlledPids.has(pid)) return;
   const wrap = document.getElementById(`nameWrap_${pid}`);
   const cur  = liveState?.players?.[pid]?.name || "";
   wrap.innerHTML = `<input id="nameIn_${pid}" class="text-input" style="width:160px;padding:4px 8px;font-size:15px" value="${esc(cur)}" maxlength="20"/>`;
@@ -431,6 +465,34 @@ window.doReset = async () => {
   Object.keys(players).forEach(pid => { updates[`rooms/${roomCode}/players/${pid}/log`] = {}; });
   await update(ref(db), updates);
   window.closeSummary();
+};
+
+// ── Add Player ─────────────────────────────────────────────
+document.getElementById("btnAddPlayer").onclick = () => {
+  document.getElementById("newPlayerName").value = "";
+  document.getElementById("addPlayerError").textContent = "";
+  document.getElementById("chkControlThis").checked = true;
+  document.getElementById("addPlayerModal").style.display = "flex";
+  setTimeout(() => document.getElementById("newPlayerName").focus(), 50);
+};
+
+window.hideAddPlayer = () => {
+  document.getElementById("addPlayerModal").style.display = "none";
+};
+
+document.getElementById("btnConfirmAdd").onclick = async () => {
+  const name = document.getElementById("newPlayerName").value.trim();
+  const control = document.getElementById("chkControlThis").checked;
+  if (!name) { document.getElementById("addPlayerError").textContent = "Enter a name."; return; }
+  const newPid = genPlayerId();
+  await set(ref(db, `rooms/${roomCode}/players/${newPid}`), { name, log: {} });
+  if (control) controlledPids.add(newPid);
+  hideAddPlayer();
+  showToast(`✅ ${name} added to the round!`);
+};
+
+document.getElementById("newPlayerName").onkeydown = e => {
+  if (e.key === "Enter") document.getElementById("btnConfirmAdd").click();
 };
 
 // ── QR Code ────────────────────────────────────────────────
