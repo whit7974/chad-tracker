@@ -1,0 +1,387 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
+<title>Chad Counter ⛳</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+  body { font-family: Georgia, serif; background: #2D5016; min-height: 100vh; padding-bottom: 60px; }
+
+  /* LOBBY */
+  #lobby { display:none; flex-direction:column; align-items:center; justify-content:center; min-height:100vh; padding:24px; }
+  #lobby h1 { color:#fff; font-size:32px; margin-bottom:6px; }
+  #lobby .sub { color:#7AB648; font-size:14px; margin-bottom:40px; letter-spacing:2px; text-transform:uppercase; }
+  .lobby-card { background:#F5F0E8; border-radius:16px; padding:28px 24px; width:100%; max-width:360px; box-shadow:0 6px 30px rgba(0,0,0,0.35); }
+  .lobby-card h2 { color:#2D5016; font-size:18px; margin-bottom:16px; }
+  .field-label { font-size:12px; color:#888; text-transform:uppercase; letter-spacing:1px; margin-bottom:6px; }
+  .text-input { width:100%; padding:12px 14px; border:2px solid #ddd; border-radius:10px; font-size:16px; font-family:Georgia,serif; outline:none; transition:border 0.2s; }
+  .text-input:focus { border-color:#4A7C2F; }
+  .btn-primary { width:100%; padding:14px; background:#2D5016; border:none; border-radius:10px; color:#fff; font-size:16px; font-family:Georgia,serif; font-weight:bold; cursor:pointer; margin-top:12px; }
+  .btn-primary:active { opacity:0.85; }
+  .btn-secondary { width:100%; padding:12px; background:#C9A84C; border:none; border-radius:10px; color:#2D5016; font-size:15px; font-family:Georgia,serif; font-weight:bold; cursor:pointer; margin-top:10px; }
+  .divider { display:flex; align-items:center; gap:10px; margin:20px 0; color:#aaa; font-size:13px; }
+  .divider::before, .divider::after { content:''; flex:1; height:1px; background:#ddd; }
+  .error-msg { color:#C0392B; font-size:13px; margin-top:8px; text-align:center; min-height:18px; }
+
+  /* GAME */
+  #game { display:none; }
+  .top-bar { background:#2D5016; border-bottom:3px solid #C9A84C; padding:16px 16px 12px; text-align:center; }
+  .top-bar .eyebrow { font-size:10px; letter-spacing:4px; color:#C9A84C; text-transform:uppercase; margin-bottom:2px; }
+  .top-bar h1 { font-size:24px; color:#fff; }
+  .room-pill { display:inline-block; background:rgba(255,255,255,0.12); color:#C9A84C; border-radius:20px; padding:3px 14px; font-size:12px; letter-spacing:3px; margin-top:6px; cursor:pointer; border:none; font-family:Georgia,serif; }
+  .total-banner { background:#C9A84C; padding:12px; text-align:center; }
+  .total-banner .label { font-size:10px; letter-spacing:3px; text-transform:uppercase; color:#2D5016; }
+  .total-banner .amount { font-size:38px; font-weight:bold; color:#2D5016; line-height:1.1; }
+  .players-list { padding:14px 12px; display:flex; flex-direction:column; gap:12px; }
+  .player-card { background:#F5F0E8; border-radius:12px; overflow:hidden; box-shadow:0 3px 12px rgba(0,0,0,0.25); }
+  .player-card-header { background:#4A7C2F; padding:10px 14px; display:flex; justify-content:space-between; align-items:center; }
+  .player-name-wrap { color:#fff; font-weight:bold; font-size:16px; cursor:pointer; flex:1; }
+  .player-name-wrap input { background:#fff; border:none; border-radius:6px; padding:4px 8px; font-size:15px; font-family:Georgia,serif; width:160px; outline:none; }
+  .player-total { border-radius:20px; color:#fff; padding:3px 14px; font-size:14px; font-weight:bold; min-width:52px; text-align:center; transition:background 0.3s; background:#C0392B; }
+  .player-total.zero { background:rgba(255,255,255,0.18); }
+  .chad-btns { padding:12px 12px 8px; display:flex; gap:8px; }
+  .chad-btn { flex:1; background:#2D5016; border:2px solid #7AB648; border-radius:10px; color:#fff; padding:10px 4px; cursor:pointer; text-align:center; font-family:Georgia,serif; transition:transform 0.1s; }
+  .chad-btn:active { transform:scale(0.92); }
+  .chad-btn:disabled { opacity:0.4; cursor:default; }
+  .chad-btn .icon { font-size:18px; }
+  .chad-btn .name { font-size:11px; font-weight:bold; margin-top:2px; }
+  .chad-btn .count { font-size:10px; color:#7AB648; margin-top:1px; }
+  .player-footer { padding:0 12px 10px; display:flex; justify-content:space-between; align-items:center; }
+  .footer-log { font-size:11px; color:#888; }
+  .undo-btn { background:none; border:none; color:#aaa; font-size:11px; cursor:pointer; text-decoration:underline; font-family:Georgia,serif; }
+  .actions { padding:0 12px; display:flex; gap:10px; }
+  .btn-end { flex:1; background:#C9A84C; border:none; border-radius:10px; color:#2D5016; font-weight:bold; font-size:15px; padding:14px; cursor:pointer; font-family:Georgia,serif; }
+  .btn-reset { background:rgba(255,255,255,0.1); border:1px solid rgba(255,255,255,0.3); border-radius:10px; color:#fff; font-size:13px; padding:14px 16px; cursor:pointer; font-family:Georgia,serif; }
+  .conn-pill { font-size:11px; padding:3px 10px; border-radius:20px; margin-top:6px; display:inline-block; }
+  .conn-pill.online { background:rgba(122,182,72,0.25); color:#7AB648; }
+  .conn-pill.offline { background:rgba(192,57,43,0.2); color:#e74c3c; }
+
+  /* TOAST */
+  #toast { position:fixed; top:20px; left:50%; transform:translateX(-50%); background:#C0392B; color:#fff; padding:10px 22px; border-radius:30px; font-size:14px; font-weight:bold; z-index:999; box-shadow:0 4px 20px rgba(0,0,0,0.4); opacity:0; transition:opacity 0.25s; pointer-events:none; white-space:nowrap; }
+  #toast.show { opacity:1; }
+
+  /* MODAL */
+  .modal-overlay { position:fixed; inset:0; background:rgba(0,0,0,0.75); display:flex; align-items:center; justify-content:center; z-index:100; padding:16px; }
+  .modal { background:#fff; border-radius:16px; padding:24px; width:100%; max-width:380px; box-shadow:0 8px 40px rgba(0,0,0,0.4); }
+  .modal h2 { color:#2D5016; font-size:22px; text-align:center; margin-bottom:4px; }
+  .modal-sub { color:#888; font-size:13px; text-align:center; margin-bottom:20px; }
+  .summary-row { display:flex; justify-content:space-between; align-items:center; padding:10px 0; border-bottom:1px solid #E8E4DC; }
+  .summary-row:last-of-type { border-bottom:none; }
+  .summary-name { font-weight:bold; color:#2D5016; }
+  .summary-detail { font-size:12px; color:#888; margin-top:2px; }
+  .summary-amount { font-weight:bold; font-size:18px; color:#C0392B; }
+  .summary-amount.zero { color:#4A7C2F; }
+  .summary-total-bar { background:#C9A84C; border-radius:10px; padding:12px 16px; display:flex; justify-content:space-between; align-items:center; margin-top:16px; }
+  .summary-total-bar span { font-weight:bold; color:#2D5016; }
+  .summary-total-bar .big { font-size:20px; }
+  .modal-btns { display:flex; gap:10px; margin-top:16px; }
+  .modal-btns button { flex:1; border:none; border-radius:10px; padding:12px; cursor:pointer; font-weight:bold; font-size:14px; font-family:Georgia,serif; }
+  .modal-btns .keep { background:#E8E4DC; color:#2D5016; }
+  .modal-btns .newround { background:#2D5016; color:#fff; }
+
+  /* SPINNER */
+  .spinner { width:40px; height:40px; border:4px solid rgba(255,255,255,0.2); border-top-color:#C9A84C; border-radius:50%; animation:spin 0.8s linear infinite; margin:0 auto 16px; }
+  @keyframes spin { to { transform:rotate(360deg); } }
+  #loading { display:flex; flex-direction:column; align-items:center; justify-content:center; min-height:100vh; color:#fff; font-size:16px; }
+</style>
+</head>
+<body>
+
+<div id="loading"><div class="spinner"></div>Loading…</div>
+
+<div id="lobby">
+  <h1>⛳ Chad Counter</h1>
+  <p class="sub">$5 to charity per bad drive</p>
+  <div class="lobby-card">
+    <h2>Start or Join a Round</h2>
+    <div class="field-label">Your name</div>
+    <input id="yourName" class="text-input" placeholder="e.g. James" maxlength="20"/>
+    <button class="btn-primary" id="btnCreate">🏌️ Start New Round</button>
+    <div class="divider">or join existing</div>
+    <div class="field-label">Room code</div>
+    <input id="joinCode" class="text-input" placeholder="e.g. BIRDIE-4829" maxlength="12" style="text-transform:uppercase;letter-spacing:2px"/>
+    <button class="btn-secondary" id="btnJoin">Join Round →</button>
+    <div class="error-msg" id="lobbyError"></div>
+  </div>
+</div>
+
+<div id="game">
+  <div class="top-bar">
+    <div class="eyebrow">Charity Drive</div>
+    <h1>⛳ Chad Counter</h1>
+    <div>
+      <button class="room-pill" id="roomPill">ROOM-????</button>
+    </div>
+    <div id="connPill" class="conn-pill offline">● connecting…</div>
+  </div>
+  <div class="total-banner">
+    <div class="label">Total Donated</div>
+    <div class="amount" id="totalAmount">$0.00</div>
+  </div>
+  <div class="players-list" id="playersList"></div>
+  <div class="actions" style="margin-top:4px">
+    <button class="btn-end" id="btnEnd">🏆 End Round</button>
+    <button class="btn-reset" id="btnReset">Reset</button>
+  </div>
+</div>
+
+<div id="toast"></div>
+<div id="summaryModal"></div>
+
+<script type="module">
+import { initializeApp }           from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+import { getDatabase, ref, set, get, onValue, update } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
+
+// ── Firebase init ──────────────────────────────────────────
+const app = initializeApp({
+  apiKey:            "AIzaSyBTmKU0yjWIsY27PPDmsw1FekeiMzs5Gfg",
+  authDomain:        "chad-b.firebaseapp.com",
+  databaseURL:       "https://chad-b-default-rtdb.firebaseio.com",
+  projectId:         "chad-b",
+  storageBucket:     "chad-b.firebasestorage.app",
+  messagingSenderId: "607038790074",
+  appId:             "1:607038790074:web:3d770fed406c643876a583"
+});
+const db = getDatabase(app);
+
+// ── Constants ──────────────────────────────────────────────
+const PENALTY    = 5;
+const CHAD_TYPES = ["Chad A", "Chad B", "Chad C"];
+const EMOJIS     = { "Chad A": "🍕", "Chad B": "⛏️", "Chad C": "💨" };
+const WORDS      = ["BIRDIE","EAGLE","BOGEY","CADDY","WEDGE","LINKS","DIVOT","FORE"];
+
+// ── State ──────────────────────────────────────────────────
+let roomCode    = null;
+let myPlayerId  = null;
+let liveState   = null;   // mirror of Firebase room
+
+// ── Helpers ────────────────────────────────────────────────
+const esc = s => String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+
+function genRoomCode() {
+  return WORDS[Math.floor(Math.random()*WORDS.length)] + "-" + (1000+Math.floor(Math.random()*9000));
+}
+function genPlayerId() {
+  return "p_" + Math.random().toString(36).slice(2,9);
+}
+function showToast(msg) {
+  const t = document.getElementById("toast");
+  t.textContent = msg;
+  t.classList.add("show");
+  clearTimeout(t._tid);
+  t._tid = setTimeout(() => t.classList.remove("show"), 2400);
+}
+function showError(msg) {
+  document.getElementById("lobbyError").textContent = msg;
+}
+
+// ── Lobby ──────────────────────────────────────────────────
+document.getElementById("btnCreate").onclick = async () => {
+  const name = document.getElementById("yourName").value.trim();
+  if (!name) { showError("Enter your name first."); return; }
+  roomCode    = genRoomCode();
+  myPlayerId  = genPlayerId();
+  await set(ref(db, `rooms/${roomCode}`), {
+    createdAt: Date.now(),
+    players: { [myPlayerId]: { name, log: {} } }
+  });
+  enterGame();
+};
+
+document.getElementById("btnJoin").onclick = async () => {
+  const name = document.getElementById("yourName").value.trim();
+  const code = document.getElementById("joinCode").value.trim().toUpperCase();
+  if (!name) { showError("Enter your name first."); return; }
+  if (!code) { showError("Enter a room code."); return; }
+  const snap = await get(ref(db, `rooms/${code}`));
+  if (!snap.exists()) { showError(`Room "${code}" not found. Check the code and try again.`); return; }
+  roomCode   = code;
+  myPlayerId = genPlayerId();
+  await set(ref(db, `rooms/${roomCode}/players/${myPlayerId}`), { name, log: {} });
+  enterGame();
+};
+
+// ── Enter game ─────────────────────────────────────────────
+function enterGame() {
+  document.getElementById("lobby").style.display = "none";
+  document.getElementById("game").style.display  = "block";
+  document.getElementById("roomPill").textContent = roomCode;
+
+  // Subscribe to live updates
+  onValue(ref(db, `rooms/${roomCode}`), snap => {
+    if (!snap.exists()) { showToast("Room closed."); return; }
+    document.getElementById("connPill").textContent = "● live";
+    document.getElementById("connPill").className   = "conn-pill online";
+    liveState = snap.val();
+    renderGame();
+  }, () => {
+    document.getElementById("connPill").textContent = "● offline";
+    document.getElementById("connPill").className   = "conn-pill offline";
+  });
+}
+
+// ── Render ─────────────────────────────────────────────────
+function renderGame() {
+  const players = liveState?.players || {};
+  let total = 0;
+  const list = document.getElementById("playersList");
+  list.innerHTML = "";
+
+  const sorted = Object.entries(players).sort(([a],[b]) =>
+    a === myPlayerId ? -1 : b === myPlayerId ? 1 : 0
+  );
+
+  sorted.forEach(([pid, player]) => {
+    const logArr  = Object.values(player.log || {});
+    const pTotal  = logArr.length * PENALTY;
+    total += pTotal;
+    const isMe    = pid === myPlayerId;
+    const counts  = Object.fromEntries(CHAD_TYPES.map(c => [c, logArr.filter(e=>e.type===c).length]));
+    const lastLog = logArr.length > 0 ? logArr[logArr.length-1].type : null;
+
+    const card = document.createElement("div");
+    card.className = "player-card";
+    card.innerHTML = `
+      <div class="player-card-header">
+        <div class="player-name-wrap" id="nameWrap_${pid}">
+          ${isMe
+            ? `<span style="cursor:pointer" onclick="editName('${pid}')">${esc(player.name)} ✏️</span>`
+            : esc(player.name)
+          }
+        </div>
+        <div class="player-total ${pTotal===0?'zero':''}">$${pTotal}</div>
+      </div>
+      <div class="chad-btns">
+        ${CHAD_TYPES.map(chad => `
+          <button class="chad-btn" ${isMe ? `onclick="addChad('${pid}','${esc(chad)}')"` : 'disabled'}>
+            <div class="icon">${EMOJIS[chad]}</div>
+            <div class="name">${chad}</div>
+            <div class="count">×${counts[chad]}</div>
+          </button>`).join("")}
+      </div>
+      <div class="player-footer">
+        <div class="footer-log">
+          ${logArr.length === 0
+            ? "No bad drives yet 🎯"
+            : `${logArr.length} bad drive${logArr.length>1?"s":""} · Last: ${lastLog}`}
+        </div>
+        ${isMe && logArr.length > 0
+          ? `<button class="undo-btn" onclick="undoLast('${pid}')">undo</button>`
+          : ""}
+      </div>`;
+    list.appendChild(card);
+  });
+
+  document.getElementById("totalAmount").textContent = `$${total.toFixed(2)}`;
+}
+
+// ── Actions ────────────────────────────────────────────────
+window.addChad = async (pid, chadType) => {
+  const logRef = ref(db, `rooms/${roomCode}/players/${pid}/log`);
+  const snap   = await get(logRef);
+  const log    = snap.val() || {};
+  const key    = `e_${Date.now()}_${Math.random().toString(36).slice(2,5)}`;
+  log[key]     = { type: chadType, ts: Date.now() };
+  await set(logRef, log);
+  const name = liveState?.players?.[pid]?.name || "Player";
+  showToast(`💸 ${name} — ${chadType}! +$${PENALTY}`);
+};
+
+window.undoLast = async (pid) => {
+  const logRef = ref(db, `rooms/${roomCode}/players/${pid}/log`);
+  const snap   = await get(logRef);
+  const log    = snap.val();
+  if (!log) return;
+  const keys = Object.keys(log).sort();
+  delete log[keys[keys.length-1]];
+  await set(logRef, log);
+};
+
+window.editName = (pid) => {
+  if (pid !== myPlayerId) return;
+  const wrap = document.getElementById(`nameWrap_${pid}`);
+  const cur  = liveState?.players?.[pid]?.name || "";
+  wrap.innerHTML = `<input id="nameIn_${pid}" class="text-input" style="width:160px;padding:4px 8px;font-size:15px" value="${esc(cur)}" maxlength="20"/>`;
+  const inp = document.getElementById(`nameIn_${pid}`);
+  inp.focus();
+  inp.onblur   = () => saveName(pid);
+  inp.onkeydown = e => { if (e.key==="Enter") inp.blur(); };
+};
+
+window.saveName = async (pid) => {
+  const inp  = document.getElementById(`nameIn_${pid}`);
+  const name = inp?.value?.trim() || liveState?.players?.[pid]?.name;
+  await update(ref(db, `rooms/${roomCode}/players/${pid}`), { name });
+};
+
+// Room code copy
+document.getElementById("roomPill").onclick = () => {
+  navigator.clipboard?.writeText(roomCode)
+    .then(()  => showToast(`📋 ${roomCode} copied — share with your group!`))
+    .catch(()  => showToast(`Room: ${roomCode}`));
+};
+
+// ── Summary ────────────────────────────────────────────────
+document.getElementById("btnEnd").onclick = () => {
+  const players = liveState?.players || {};
+  const sorted  = Object.entries(players).sort(([,a],[,b]) =>
+    Object.keys(b.log||{}).length - Object.keys(a.log||{}).length
+  );
+  let total = 0;
+  const rows = sorted.map(([, player]) => {
+    const log  = Object.values(player.log || {});
+    const amt  = log.length * PENALTY;
+    total += amt;
+    const detail = CHAD_TYPES.map(c => {
+      const n = log.filter(e=>e.type===c).length;
+      return n>0 ? `${c}: ${n}` : null;
+    }).filter(Boolean).join(" · ") || "Clean round! 🎯";
+    return `<div class="summary-row">
+      <div>
+        <div class="summary-name">${esc(player.name)}</div>
+        <div class="summary-detail">${detail}</div>
+      </div>
+      <div class="summary-amount ${amt===0?'zero':''}">$${amt}</div>
+    </div>`;
+  }).join("");
+
+  const modal = document.getElementById("summaryModal");
+  modal.style.display = "flex";
+  modal.className = "modal-overlay";
+  modal.innerHTML = `
+    <div class="modal">
+      <div style="text-align:center;font-size:36px;margin-bottom:8px">🏆</div>
+      <h2>Round Summary</h2>
+      <p class="modal-sub">Time to settle up with the charity jar!</p>
+      ${rows}
+      <div class="summary-total-bar">
+        <span>💚 Total to Charity</span>
+        <span class="big">$${total.toFixed(2)}</span>
+      </div>
+      <div class="modal-btns">
+        <button class="keep"     onclick="closeSummary()">Keep Playing</button>
+        <button class="newround" onclick="doReset()">New Round</button>
+      </div>
+    </div>`;
+};
+
+window.closeSummary = () => { document.getElementById("summaryModal").style.display = "none"; };
+
+document.getElementById("btnReset").onclick = () => doReset();
+
+window.doReset = async () => {
+  if (!confirm("Reset all scores for a new round?")) return;
+  const players = liveState?.players || {};
+  const updates = {};
+  Object.keys(players).forEach(pid => { updates[`rooms/${roomCode}/players/${pid}/log`] = {}; });
+  await update(ref(db), updates);
+  window.closeSummary();
+};
+
+// ── Boot ───────────────────────────────────────────────────
+document.getElementById("loading").style.display = "none";
+document.getElementById("lobby").style.display   = "flex";
+</script>
+</body>
+</html>
